@@ -15,3 +15,9 @@ julia = "1"
 DemeNet = "^0.1.1"
 DiffieHellman = "^0.4"
 SMTPClient = "^0.3.1"
+
+[extras]
+PeaceCypher = "7743456c-e0c5-4477-a2b6-196c240b0368"
+
+[targets]
+test = ["PeaceCypher"]
