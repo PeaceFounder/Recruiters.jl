@@ -12,7 +12,7 @@ Dict(id::MemberID) = Dict(id.id)
 MemberID(dict::Dict) = MemberID(ID(dict))
 
 
-demespec = DemeSpec("PeaceDeme",:default,:PeaceCypher,:default,:PeaceCypher,:PeaceFounder)
+demespec = DemeSpec("PeaceDeme",:default,:PeaceCypher,:default,:PeaceCypher,:Recruiters)
 deme = Deme(demespec)
 
 maintainer = Signer(deme,"maintainer")
