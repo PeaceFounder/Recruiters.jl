@@ -1,0 +1,17 @@
+name = "Recruiters"
+uuid = "deefbfe4-5b57-4941-9cbb-7e0220485fa4"
+authors = ["akels <akels14@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+DemeNet = "311d44f8-95d5-40c8-b71c-a916d7747227"
+DiffieHellman = "0e61fee8-20a4-4374-8233-5198f28d9d66"
+Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
+SMTPClient = "c35d69d1-b747-5018-a192-25bc5e63c83d"
+Sockets = "6462fe0b-24de-5631-8697-dd941f90decc"
+
+[compat]
+julia = "1"
+DemeNet = "^0.1.1"
+DiffieHellman = "^0.4"
+SMTPClient = "^0.3.1"
