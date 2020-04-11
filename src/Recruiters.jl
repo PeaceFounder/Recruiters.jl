@@ -1,7 +1,7 @@
 ### Could be part of PeaceVote
 module Recruiters
 
-using DemeNet: Certificate, Signer, AbstractID, Deme, Notary, Cypher, DemeSpec, Profile, AbstractID, ID, DHsym, DHasym
+using DemeNet: Certificate, Signer, AbstractID, Deme, Notary, Cypher, DemeSpec, Profile, AbstractID, ID, DHsym, DHasym, Intent, save
 using DiffieHellman: diffiehellman
 using Sockets
 import DemeNet: serialize, deserialize
@@ -9,9 +9,9 @@ import Base.Dict
 
 using SMTPClient
 
+using Pkg.TOML
 
 include("debug.jl")
-
 
 function stack(io::IO,msg::Vector{UInt8})
     frontbytes = reinterpret(UInt8,Int16[length(msg)])
@@ -34,15 +34,15 @@ struct Tooken
     tooken::Int
 end
 
-struct TookenID{T<:AbstractID} <: AbstractID
-    id::T
+struct TookenID #{T<:AbstractID} <: AbstractID
+    cert::Certificate{Profile}
     tooken::Tooken
 end
 
-Dict(id::TookenID) = Dict("id"=>Dict(id.id),"tooken"=>id.tooken.tooken)
+Dict(id::TookenID) = Dict("cert"=>Dict(id.cert),"tooken"=>id.tooken.tooken)
 
-function TookenID{T}(dict::Dict) where T <: AbstractID
-    id = T(dict["id"])
+function TookenID(dict::Dict) 
+    id = Certificate{Profile}(dict["cert"])
     tooken = Tooken(dict["tooken"])
     return TookenID(id,tooken)
 end
@@ -65,7 +65,6 @@ struct CertifierConfig{T<:Any}
     tookenca::ID ### authorithies who can issue tookens. Server allows to add new tookens only from them.
     serverid::ID ### Server receiveing tookens and the member identities. Is also the one which signs and issues the certificates.
     tookenport::T
-    #hmac for keeping the tooken secret
     certifierport::T
 end
 
@@ -111,16 +110,16 @@ function SecureRegistrator{T}(port,deme::Deme,validate::Function,signer::Signer)
     SecureRegistrator(server,daemon,messages)
 end
 
-struct TookenCertifier{T}
+struct TookenCertifier
     server
     daemon
     tookens::Set{Tooken}
-    tickets::Dict{Tooken,Certificate{T}}
+    tickets::Channel{Tuple{Tooken,Certificate{Profile},Certificate{ID}}}
 end
 
-function TookenCertifier{T}(port,deme::Deme,signer::Signer) where T<:AbstractID
+function TookenCertifier(port,deme::Deme,signer::Signer; cert=nothing, sendcopy=false) 
     tookens = Set{Tooken}()   
-    tickets = Dict{Tooken,Certificate{T}}()
+    tickets = Channel{Tuple{Tooken,Certificate{Profile},Certificate{ID}}}(Inf)
 
     server = listen(port)
     dh = DHasym(deme,signer)
@@ -128,20 +127,31 @@ function TookenCertifier{T}(port,deme::Deme,signer::Signer) where T<:AbstractID
     daemon = @async while true
         socket = accept(server)
         @async begin
+            cert==nothing || serialize(socket,cert)
             
             key, id = diffiehellman(socket,dh)
             securesocket = deme.cypher.secureio(socket,key)
 
-            id = deserialize(securesocket,TookenID{T}) ### Need to implement
+            id = deserialize(securesocket,TookenID) ### Need to implement
 
             @assert id.tooken in tookens
             pop!(tookens,id.tooken)
 
-            cert = Certificate(id.id,signer)
+            intentid = Intent(id.cert,deme.notary)
 
-            tickets[id.tooken] = cert
-            
-            serialize(securesocket,cert) ### For this one we already jnow
+            regid = intentid.reference
+
+            # here one could verify that the id is indeed real
+            # validate(profile,id.tooken) 
+
+            idcert = Certificate(regid,signer)
+
+            #tickets[id.tooken] = cert
+
+            push!(tickets,(id.tooken,id.cert,idcert))
+
+            # This part could be optional
+            sendcopy && serialize(securesocket,cert) ### For this one we already jnow
         end
     end
     
@@ -149,16 +159,21 @@ function TookenCertifier{T}(port,deme::Deme,signer::Signer) where T<:AbstractID
 end
 
 
-struct Certifier{T<:AbstractID} 
+struct Certifier
     tookenrecorder::SecureRegistrator{Tooken}
-    tookencertifier::TookenCertifier{T}
+    tookencertifier::TookenCertifier
     daemon
 end
 
-function Certifier{T}(config::CertifierConfig,deme::Deme,signer::Signer) where T<:AbstractID
+function Certifier(config::CertifierConfig,deme::Deme,signer::Signer; cert=nothing, sendcopy=false)
+
+    # It could be added as part of config
+    # intent = Intent(config.serverid,deme.notary)
+    # @assert intent.reference==deme.spec.maintainer "The certificate invalid for this deme"
+    # @assert intent.document==signer.id "The provided signer does not match the certificate"
     
     tookenrecorder = SecureRegistrator{Tooken}(config.tookenport,deme,x->x in config.tookenca,signer)
-    tookencertifier = TookenCertifier{T}(config.certifierport,deme,signer)
+    tookencertifier = TookenCertifier(config.certifierport,deme,signer; cert=cert, sendcopy=sendcopy)
 
     daemon = @async while true
         tooken = take!(tookenrecorder.messages)
@@ -187,60 +202,99 @@ end
 addtooken(cc::CertifierConfig,deme::Deme,tooken::Int,signer::Signer) = addtooken(cc,deme,Tooken(tooken),signer)
 
 
-function certify(cc::CertifierConfig,deme::Deme,id::T,tooken::Tooken) where T <: AbstractID
-
-    socket = connect(cc.certifierport)
+function certify(port,serverid::ID,deme::Deme,cert::Certificate{Profile},tooken::Tooken; sendcopy=false)
+    socket = connect(port)
 
     dh = DHasym(deme)
 
     key, keyid = diffiehellman(socket,dh)
 
-    @assert keyid in cc.serverid
+    @assert keyid in serverid
 
     securesocket = deme.cypher.secureio(socket,key)
-    serialize(securesocket,TookenID(id,tooken)) 
-    
-    cert = deserialize(securesocket,Certificate{T})
+    serialize(securesocket,TookenID(cert,tooken)) 
 
-    return cert
+    sendcopy && (return deserialize(securesocket,Certificate{ID}))
 end
 
-certify(cc::CertifierConfig,deme::Deme,id::T,tooken::Int) where T <: AbstractID = certify(cc,deme,id,Tooken(tooken))
+certify(port,serverid::ID,deme::Deme,cert::Certificate{Profile},tooken::Int; kwargs...) = certify(port,serverid,deme,cert,Tooken(tooken); kwargs...)
 
-
-function ticket(deme::DemeSpec,port,tooken::Int)
-    config = Dict("demespec"=>Dict(deme),"port"=>Dict(port),"tooken"=>tooken)
+function str(config::Dict)
     io = IOBuffer()
     TOML.print(io, config)
     return String(take!(io))
 end
 
+function ticket(deme::DemeSpec,port,server::ID,tooken::Int)
+    config = Dict("demespec"=>Dict(deme),"port"=>Dict(port),"tooken"=>tooken,"server"=>string(server,base=16))
+    return str(config)
+end
+
+function ticket(deme::DemeSpec,port::Int,server::ID,tooken::Int)
+    config = Dict("demespec"=>Dict(deme),"port"=>Dict("type"=>"Int","port"=>port),"tooken"=>tooken,"server"=>string(server,base=16))
+    return str(config)
+end
+
+
 ### To use this function one is supposed to know
 ### How to create a identity
 
-function register(invite::Dict,profile::Profile; account="")
+### I could make a function which would assume that ID type would be of a type ID. A function for Port could be passed. The problem is that we could not allow 
+
+struct Port
+    port::Int
+    ip::Union{IPv4,IPv6} 
+end
+
+import Sockets.connect
+connect(port::Port) = connect(port.ip,port.port)
+
+function Dict(port::Port)
+    dict = Dict()
+    if port.ip isa IPv4
+        dict["type"]="IPv4"
+    else
+        dict["type"]="IPv6"
+    end
+    
+    dict["port"] = port.port
+    dict["ip"] = string(port.ip)
+
+    return dict
+end
+
+struct RegPort{T} end
+RegPort(type::AbstractString) = RegPort{Symbol(type)}()
+
+port(::RegPort{:IPv4},config::Dict) = Port(config["port"],IPv4(config["ip"]))
+port(::RegPort{:IPv6},config::Dict) = Port(config["port"],IPv6(config["ip"]))
+port(::RegPort{:Int},config::Dict) = config["port"]
+
+function register(invite::Dict,profile::Profile; account="") where T <: AbstractID
 
     demespec = DemeSpec(invite["demespec"])
     save(demespec)
-
     deme = Deme(demespec)
-    if haskey(invite,"port")
-        sync!(deme,invite["port"]) 
-    end
 
-    tooken = invite["tooken"]
-    #keychain = KeyChain(deme,account)
-    member = Signer(deme,"member")
-    id = member.id
-
+    portdict = invite["port"] 
     
-    register(deme,profile,id,tooken)
+    @assert haskey(portdict,"type") "The type of the port must be defined"
+
+    type = RegPort(portdict["type"])
+    regport = port(type,portdict)
+    
+    serverid = ID(invite["server"],base=16)
+    
+    tooken = invite["tooken"]
+
+    member = Signer(deme,"member")
+    profilecert = Certificate(profile,member)
+
+    certify(regport,serverid,deme,profilecert,tooken)
 end
 
 
 register(invite::AbstractString,profile::Profile; kwargs...) = register(TOML.parse(invite),profile; kwargs...)
-
-
 
 
 struct SMTPConfig
@@ -266,19 +320,17 @@ function SMTPConfig()
 end
 
 ### Need to think about this part 
-### Perhaps I could add additional metadata as dictionary
+### Perhaps I could add additional metadata as dictionary!
 
 function sendinvite(config::CertifierConfig,deme::Deme,to::AbstractString,from::SMTPConfig,maintainer::Signer; init=nothing)
     ### This would register a tooken with the system 
 
     tooken = rand(2^62:2^63-1)
-    Recruiters.addtooken(config.certifier,deme,tooken,maintainer)
+    addtooken(config,deme,tooken,maintainer)
 
-    port = config.syncport
-    
     opt = SendOptions(isSSL = true, username = from.email, passwd = from.password)
 
-    t = ticket(deme.spec,port,tooken)
+    t = ticket(deme.spec,config.certifierport,config.serverid,tooken)
 
     body = """
     From: $(from.email)
@@ -293,19 +345,8 @@ function sendinvite(config::CertifierConfig,deme::Deme,to::AbstractString,from::
     send(from.url, [to], from.email, IOBuffer(body), opt)  
 end
 
-
-# function sendinvite(deme::Deme,to::Vector{T},smtpconfig::SMTPConfig,maintainer::Signer) where T<:AbstractString
-#     config = deserialize(deme,SystemConfig)
-#     for ito in to
-#         sendinvite(config,deme,ito,smtpconfig,maintainer)
-#     end
-# end
-
-
 sendinvite(config::CertifierConfig,deme::Deme,to::Vector{T},maintainer::Signer; init=nothing) where T<:AbstractString = sendinvite(config,deme,to,SMTPConfig(),maintainer; init=init)
 
-
-
-export addtooken, Certifier, certify, CertifierConfig
+export CertifierConfig, Certifier, addtooken, certify, ticket, register, sendinvite, SMTPConfig
 
 end
