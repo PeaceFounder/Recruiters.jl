@@ -287,7 +287,7 @@ function register(invite::Dict,profile::Profile; account="") where T <: Abstract
     
     tooken = invite["tooken"]
 
-    member = Signer(deme,"member")
+    member = Signer(deme,account * "/member")
     profilecert = Certificate(profile,member)
 
     certify(regport,serverid,deme,profilecert,tooken)
