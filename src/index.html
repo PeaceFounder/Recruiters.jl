@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>{{:TITLE}}</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+        <link rel="stylesheet" href="/css/style.css"/>
+</head>
+<body class="form-v4">
+	<div class="page-content">
+		<div class="form-v4-content">
+			<div class="form-left">
+
+                          <h2>{{:TITLE}}</h2>
+
+                          <div class="text-1">
+                            
+                            {{{:PITCH}}}
+
+                          </div>
+
+			</div>
+			<form class="form-detail" method="post" id="myform">
+				<h2>REGISTRATION FORM</h2>
+				
+
+                                <div class="form-row">
+				  <label for="name">Name</label>
+				  <input type="text" name="name" placeholder="Enter Name" id="name" class="input-text" required>
+				</div>
+
+				<div class="form-row">
+					<label for="your_email">Email</label>
+					<input type="text" name="email" placeholder="Enter Email" id="your_email" class="input-text" required pattern="[^@]+@[^@]+.[a-zA-Z]{2,6}">
+				</div>
+
+                                
+                                <div class="form-row" style="font-size: 10pt; color: #D72E2E;" id="errorContainer">
+                                  
+				</div>
+
+				<div class="form-row-last">
+				  <input type="submit" name="register" class="register" value="Register">
+				</div>
+			</form>
+		</div>
+	</div>
+</body>
+
+<script>
+  const form = document.querySelector('#myform');
+  const errorContainer = document.getElementById('errorContainer');
+  
+
+  form.addEventListener('submit', event => {
+      event.preventDefault();
+      
+      const formData = new FormData(form);
+      const jsonObject = Object.fromEntries(formData);
+      const jsonData = JSON.stringify(jsonObject);
+
+      console.log(jsonData)
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/register');
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.send(jsonData);
+
+      xhr.onreadystatechange = () => {
+
+
+          if (xhr.readyState === XMLHttpRequest.DONE) {
+
+              if (xhr.status === 200) {
+
+
+                  form.innerHTML = `
+<h2>SUCCESS<\/h2> 
+
+  <div class="form-row">
+    Invite is sent to ` + "<b>" + jsonObject.email + "</b>" +
+                      `. Don't forget to check your spambox :) 
+  </div>
+
+  <p></p>
+
+  <div class="form-row-last">
+    <input type="submit" name="register" onclick="location.reload();" class="register" value="Continue">
+  </div>
+`;
+
+              } else if (xhr.status === 400) {
+
+                  errorContainer.innerHTML = "ERROR: Provided email address is already in use and no longer can be used to register to the deme.";
+                  
+                  console.log("Response: " + xhr.responseText);
+              } else {
+
+                  console.log("Untreated error state: " + xhr.state);
+
+              }
+          }
+
+      };
+
+  });
+
+</script>
+
+</html>
