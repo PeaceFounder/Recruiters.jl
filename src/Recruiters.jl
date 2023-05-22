@@ -57,6 +57,7 @@ function get_ticketid(form::RegistrationForm)
 end
 
 
+using Infiltrator
 
 function send(invite::Invite, email::String)
 
@@ -72,10 +73,10 @@ function send(invite::Invite, email::String)
     To use it open the PeaceFounder on your device and copy-paste this string into the form for adding the deme. The device will generate a private key, will use a token to get a recruiter signature and then finally generate a membership certificate at the current generator which can be rolled in to the braidchain. 
     
     Yours Faithfully,
-    Guardian of $(TITLE[])
+    Guardian,
+    $(TITLE[])
     """
 
-    
     opt = SMTPClient.SendOptions(isSSL = true, username = EMAIL[], passwd = EMAIL_PASSWD[])
 
     SMTPClient.send(SMTP[], [email], EMAIL[], IOBuffer(body), opt)
@@ -101,11 +102,9 @@ end
 
 
 function register(req) 
-
     
     form = unmarshal(req.body, RegistrationForm)
 
-    
     ticketid = get_ticketid(form)
 
     try
@@ -116,8 +115,10 @@ function register(req)
 
         return Response(200, "Everything is ok")
 
-    catch
+    catch e
         
+        @show e
+
         return Response(400, "Email $(form.email) is already admitted. If you have not received the invite or it's use was unsuccesful you may have become a victim of a stolen identity. To proceed you may want to ask the guardian for erasure and evaluate security of your local device and email account.")
         
     end
@@ -151,7 +152,6 @@ function serve(recruiter::Route, hmac::HMAC, smtp::String, email::String, email_
 
     return
 end
-
 
 
 export HMAC, Route, serve

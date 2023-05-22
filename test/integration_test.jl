@@ -3,8 +3,7 @@ using Recruiters
 import PeaceFounder: Model, Mapper, Service
 import .Model: TicketID, CryptoSpec, DemeSpec, Signer, id, approve
 
-
-crypto = CryptoSpec("SHA-256", "MODP", UInt8[1, 2, 3, 6])
+crypto = CryptoSpec("sha256", "EC: P_192")
 
 GUARDIAN = Model.generate(Signer, crypto)
 PROPOSER = Model.generate(Signer, crypto)
@@ -28,14 +27,16 @@ Mapper.capture!(demespec)
 
 # Everything necessary to start a service
 
-RECRUIT_ROUTE = Recruiters.Route(Service.ROUTER)
+# Only for a test. This is not reachable by a client:
+RECRUIT_ROUTE = Recruiters.Route(Service.ROUTER) 
 RECRUIT_HMAC = Recruiters.HMAC(Mapper.get_recruit_key(), Model.hasher(demespec))
 
 SMTP = "smtps://mail.inbox.lv:465" 
 EMAIL = "demerecruit@inbox.lv"
 
-println("Enter $EMAIL password:")
-EMAIL_PASSWORD = readline()
+# To use environment variable do 
+# export RECRUIT_EMAIL_PASSWORD='Password'
+EMAIL_PASSWORD = ENV["RECRUIT_EMAIL_PASSWORD"] 
 
 title = "Local Democratic Community"
 pitch = """
@@ -44,4 +45,4 @@ pitch = """
 <p> Our community is a group of individuals who are passionate about promoting progressive values and creating positive change in our neighborhoods and towns. We believe that by working together, we can build a more just and equitable society for everyone. As a member of our community, you will have the opportunity to attend events, participate in volunteer activities, and engage in meaningful discussions about the issues that matter most to you.</p>
 """
 
-Recruiters.serve(RECRUIT_ROUTE, RECRUIT_HMAC, SMTP, EMAIL, EMAIL_PASSWD; title, pitch)
+Recruiters.serve(RECRUIT_ROUTE, RECRUIT_HMAC, SMTP, EMAIL, EMAIL_PASSWORD; title, pitch)

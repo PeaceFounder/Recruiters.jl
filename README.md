@@ -12,7 +12,7 @@ To use the Recruiter, you first need to set up a PeaceFounder deme with a recrui
 - A `KEY` and a `HASH` function are used for authorisation operations 
 - The internet location `URL` to the deme
 
-The second ingredient is an SMTP service which enables to send off emails by a trusted email provider. Unfortunately, many popular email providers like GMAIL, Outlook and others have discontinued their SMTP services in the name of two-factor authentification. Those who still do support SMTP tend to be outcasted as junk when BIG providers receive emails from them. Thus getting SMTP can take a little bit of research to work. The ingredients you need explicitly are:
+The second ingredient is an SMTP service which enables to send off emails by a trusted email provider. Unfortunately, many popular email providers like GMAIL, Outlook and others have discontinued their SMTP services in the name of two-factor authentification. Those who still do support SMTP tend to be outcasted as junk when BIG providers receive emails from them. Thus getting SMTP to work can take a little bit of research. The ingredients you need explicitly are:
 
 - SMTP service location like `smtps://mail.inbox.lv:465`
 - Email address and password
@@ -39,11 +39,11 @@ And this is it! You can choose to host it with the deme or on a separate server 
 
 ## Security considerations
 
-It is fine to host the Recruiter on a dynamic IP address without a certificate as long as the information provided in the form plus the IP address is not considered sensitive or attainable to a potential eavesdropper. Nevertheless, you may opt for an SSL certificate to avoid scaring users away when the browser informs them that the site is unsecured. 
+Hosting the Recruiter on a dynamic IP address without a certificate is fine as long as the information provided in the form plus the IP address is not considered sensitive or attainable to a potential eavesdropper. Nevertheless, you may opt for an SSL certificate to avoid scaring users away when the browser informs them that the site is unsecured. 
 
 There is also no need to have a confidential connection with the deme server as the token is computed with the `KEY` at both endpoints without ever being transmitted. 
 
 ## Further work
 
-It is fairly possible that there already is a protocol specification which uses HMAC in the same way as I have done so. It would be great then to comply with the specification to analyse implementation easier.
+It is fairly possible that there already is a protocol specification which uses HMAC in the same way as I have done so. It would be great then to comply with the specification to make implementation easier to analyse.
 
