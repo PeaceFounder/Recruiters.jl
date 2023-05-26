@@ -1,7 +1,5 @@
 module Recruiters
 
-using Infiltrator
-
 import Mustache
 
 import HTTP: Request, Response
