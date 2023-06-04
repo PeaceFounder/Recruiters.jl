@@ -55,8 +55,6 @@ function get_ticketid(form::RegistrationForm)
 end
 
 
-using Infiltrator
-
 function send(invite::Invite, email::String)
 
     body = """
